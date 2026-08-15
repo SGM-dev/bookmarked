@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { Socket } from "socket.io-client";
 import { listResources } from "@/lib/api";
 import { AuthState, Resource } from "@/lib/types";
 import ResourceCard from "./ResourceCard";
 
 interface FeedProps {
   auth: AuthState | null;
-  refreshToken: number;
+  socket: Socket | null;
 }
 
-export default function Feed({ auth, refreshToken }: FeedProps) {
+export default function Feed({ auth, socket }: FeedProps) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [tagFilter, setTagFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,8 +41,9 @@ export default function Feed({ auth, refreshToken }: FeedProps) {
         if (!cancelled) setResources(fetched);
       })
       .catch((err) => {
-        if (!cancelled)
+        if (!cancelled) {
           setError(err instanceof Error ? err.message : "Something went wrong");
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -49,7 +51,35 @@ export default function Feed({ auth, refreshToken }: FeedProps) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery,tagFilter, refreshToken, mineOnly, auth]);
+  }, [debouncedQuery,tagFilter, mineOnly, auth]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    function handleCreated(resource: Resource) {
+      const matchesMineOnlyFilter =
+        !mineOnly || (auth && resource?.submittedBy?.id === auth.user.id);
+      const matchesTagFilter =
+        !tagFilter || (resource.tags && resource.tags.includes(tagFilter));
+
+      if (matchesMineOnlyFilter && matchesTagFilter) {
+        setResources((prev) => [resource, ...prev]);
+      }
+    }
+
+    function handleUpdated(updated: Resource) {
+      setResources((prev) =>
+        prev.map((r) => (r.id === updated.id ? updated : r)),
+      );
+    }
+
+    socket.on("resource:created", handleCreated);
+    socket.on("resource:updated", handleUpdated);
+    return () => {
+      socket.off("resource:created", handleCreated);
+      socket.off("resource:updated", handleUpdated);
+    };
+  }, [socket, auth, mineOnly, tagFilter]);
 
   const tags = useMemo(() => {
     const set = new Set<string>();
@@ -59,9 +89,15 @@ export default function Feed({ auth, refreshToken }: FeedProps) {
     return Array.from(set).sort();
   }, [resources]);
 
-  function handleUpdated(updated: Resource) {
+  function handleReactionUpdated(updated: Resource) {
     setResources((prev) =>
       prev.map((r) => (r.id === updated.id ? updated : r)),
+    );
+  }
+
+  function handleDeleted(resourceId: string) {
+    setResources((prev) =>
+      prev.filter((resource) => resource.id !== resourceId),
     );
   }
 
@@ -108,7 +144,8 @@ export default function Feed({ auth, refreshToken }: FeedProps) {
             key={resource.id}
             resource={resource}
             auth={auth}
-            onUpdated={handleUpdated}
+            onUpdated={handleReactionUpdated}
+            onDeleted={handleDeleted}
           />
         ))}
       </div>
