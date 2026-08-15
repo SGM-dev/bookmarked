@@ -15,12 +15,29 @@ const resourceInclude = {
 // GET /api/resources?tag=<tag>&submittedBy=<userId>
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { tag, submittedBy } = req.query;
+    const { tag, submittedBy, q } = req.query;
+
+    let matchingIds: string[] | undefined;
+
+    if (typeof q === "string") {
+      const searchTerm = q.trim();
+
+      if (searchTerm) {
+        const matches = await prisma.$queryRaw<{ id: string }[]>`
+          select id from "Resource" where to_tsvector(
+            'english', coalesce("title",'') || ' ' || coalesce("description", '')
+          ) @@ websearch_to_tsquery('english', ${searchTerm})
+        `;
+
+        matchingIds = matches.map(({ id }) => id);
+      }
+    }
 
     const resources = await prisma.resource.findMany({
       where: {
         ...(typeof tag === "string" ? { tags: { has: tag.trim().toLowerCase() } } : {}),
         ...(typeof submittedBy === "string" ? { submittedById: submittedBy } : {}),
+        ...(matchingIds !== undefined ? { id: { in: matchingIds}}: {})
       },
       orderBy: { createdAt: "desc" },
       include: resourceInclude,
