@@ -39,8 +39,9 @@ export function login(input: { email: string; password: string }) {
   return request<AuthState>("/api/auth/login", { method: "POST", body: input });
 }
 
-export function listResources(params: { tag?: string; submittedBy?: string } = {}) {
+export function listResources(params: { tag?: string; submittedBy?: string; q?: string } = {}) {
   const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
   if (params.tag) search.set("tag", params.tag);
   if (params.submittedBy) search.set("submittedBy", params.submittedBy);
   const query = search.toString() ? `?${search.toString()}` : "";
