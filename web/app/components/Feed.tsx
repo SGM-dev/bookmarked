@@ -13,6 +13,8 @@ interface FeedProps {
 export default function Feed({ auth, refreshToken }: FeedProps) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [tagFilter, setTagFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("")
   const [mineOnly, setMineOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,9 +24,15 @@ export default function Feed({ auth, refreshToken }: FeedProps) {
   }, [auth]);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     listResources({
+      q: debouncedQuery || undefined,
       tag: tagFilter || undefined,
       submittedBy: mineOnly && auth ? auth.user.id : undefined,
     })
@@ -41,7 +49,7 @@ export default function Feed({ auth, refreshToken }: FeedProps) {
     return () => {
       cancelled = true;
     };
-  }, [tagFilter, refreshToken, mineOnly, auth]);
+  }, [debouncedQuery,tagFilter, refreshToken, mineOnly, auth]);
 
   const tags = useMemo(() => {
     const set = new Set<string>();
@@ -71,6 +79,7 @@ export default function Feed({ auth, refreshToken }: FeedProps) {
             </option>
           ))}
         </select>
+        <input type="search" placeholder="Search resources..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="search-input"/>
         {auth && (
           <label className="mine-toggle">
             <input
