@@ -162,7 +162,9 @@ section {
   background-color: #ffffff;
   color: #1a1a2e;
   outline: none;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition:
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
 }
 .search-input:focus {
   border-color: #2f8f5b;

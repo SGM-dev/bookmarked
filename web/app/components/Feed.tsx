@@ -15,7 +15,7 @@ export default function Feed({ auth, socket }: FeedProps) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [tagFilter, setTagFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [mineOnly, setMineOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +51,7 @@ export default function Feed({ auth, socket }: FeedProps) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery,tagFilter, mineOnly, auth]);
+  }, [debouncedQuery, tagFilter, mineOnly, auth]);
 
   useEffect(() => {
     if (!socket) return;
@@ -115,7 +115,13 @@ export default function Feed({ auth, socket }: FeedProps) {
             </option>
           ))}
         </select>
-        <input type="search" placeholder="Search resources..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="search-input"/>
+        <input
+          type="search"
+          placeholder="Search resources..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="search-input"
+        />
         {auth && (
           <label className="mine-toggle">
             <input
