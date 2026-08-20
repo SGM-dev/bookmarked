@@ -80,6 +80,12 @@ export function listResources(
   return request<{ resources: Resource[] }>(`/api/resources${query}`);
 }
 
+export function getTagCounts() {
+  return request<{ tagCounts: Record<string, number> }>(
+    "/api/resources/tag-counts",
+  );
+}
+
 export function createResource(
   input: {
     title: string;
@@ -137,16 +143,6 @@ export function addReaction(
   );
 }
 
-export function removeReaction(
-  input: { resourceId: string; reactionId: string },
-  token: string,
-) {
-  return request<{ resource: Resource }>(
-    `/api/resources/${input.resourceId}/reactions/${input.reactionId}`,
-    { method: "DELETE", token },
-  );
-}
-
 export function reportResource(resourceId: string, token: string) {
   return request<{ resource: Resource }>(
     `/api/resources/${resourceId}/report`,
@@ -154,5 +150,37 @@ export function reportResource(resourceId: string, token: string) {
       method: "POST",
       token,
     },
+  );
+}
+
+export async function exportResources(
+  format: "csv" | "json",
+  token: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(`${API_URL}/api/resources/export?format=${format}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Export failed with status ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition");
+  const match = disposition?.match(/filename="(.+)"/);
+  const filename =
+    match?.[1] || `resources.${format === "csv" ? "csv" : "json"}`;
+
+  return { blob, filename };
+}
+
+export function removeReaction(
+  input: { resourceId: string; reactionId: string },
+  token: string,
+) {
+  return request<{ resource: Resource }>(
+    `/api/resources/${input.resourceId}/reactions/${input.reactionId}`,
+    { method: "DELETE", token },
   );
 }

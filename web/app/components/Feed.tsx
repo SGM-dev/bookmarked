@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { listResources } from "@/lib/api";
 import { AuthState, Resource } from "@/lib/types";
+import { useReactionHistory } from "@/lib/useReactionHistory";
 import ResourceCard from "./ResourceCard";
+import TagFilter from "./TagFilter";
 
 interface FeedProps {
   auth: AuthState | null;
@@ -19,6 +21,9 @@ export default function Feed({ auth, socket }: FeedProps) {
   const [mineOnly, setMineOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { history: reactionHistory, recordReaction } = useReactionHistory(
+    auth?.user.id ?? null,
+  );
 
   useEffect(() => {
     if (!auth) setMineOnly(false);
@@ -104,17 +109,7 @@ export default function Feed({ auth, socket }: FeedProps) {
   return (
     <div className="feed">
       <div className="filter-bar">
-        <select
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
-        >
-          <option value="">All tags</option>
-          {tags.map((tag) => (
-            <option key={tag} value={tag}>
-              {tag}
-            </option>
-          ))}
-        </select>
+        <TagFilter tags={tags} value={tagFilter} onChange={setTagFilter} />
         <input
           type="search"
           placeholder="Search resources..."
@@ -135,12 +130,12 @@ export default function Feed({ auth, socket }: FeedProps) {
       </div>
 
       {error && <p className="error">{error}</p>}
-      {loading && <p className="hint">Loading resources...</p>}
+      {loading && <p className="hint">Getting resources ready...</p>}
       {!loading && resources.length === 0 && (
         <p className="hint">
           {mineOnly
-            ? "You haven't submitted any resources yet."
-            : "No resources yet."}
+            ? "You haven't submitted any resources yet. Add one now!"
+            : "No resources found yet. Be first to create one."}
         </p>
       )}
 
@@ -150,6 +145,8 @@ export default function Feed({ auth, socket }: FeedProps) {
             key={resource.id}
             resource={resource}
             auth={auth}
+            reactionHistory={reactionHistory}
+            onReactionSelected={recordReaction}
             onUpdated={handleReactionUpdated}
             onDeleted={handleDeleted}
           />
