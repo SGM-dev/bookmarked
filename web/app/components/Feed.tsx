@@ -13,6 +13,17 @@ interface FeedProps {
   socket: Socket | null;
 }
 
+export function matchesResourceSearch(
+  resource: { title?: string; description?: string },
+  query: string,
+): boolean {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const targetText =
+    `${resource.title ?? ""} ${resource.description ?? ""}`.toLowerCase();
+  return terms.every((term) => targetText.includes(term));
+}
+
 export default function Feed({ auth, socket }: FeedProps) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [tagFilter, setTagFilter] = useState("");
@@ -66,12 +77,10 @@ export default function Feed({ auth, socket }: FeedProps) {
         !mineOnly || (auth && resource?.submittedBy?.id === auth.user.id);
       const matchesTagFilter =
         !tagFilter || (resource.tags && resource.tags.includes(tagFilter));
-      const queryLower = debouncedQuery.trim().toLowerCase();
-      const matchesSearchFilter =
-        !queryLower ||
-        resource.title.toLowerCase().includes(queryLower) ||
-        (resource.description &&
-          resource.description.toLowerCase().includes(queryLower));
+      const matchesSearchFilter = matchesResourceSearch(
+        resource,
+        debouncedQuery,
+      );
 
       if (matchesMineOnlyFilter && matchesTagFilter && matchesSearchFilter) {
         setResources((prev) => [resource, ...prev]);
