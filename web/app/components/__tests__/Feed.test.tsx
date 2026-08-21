@@ -145,6 +145,7 @@ describe("Feed Component", () => {
       q: undefined,
       tag: undefined,
       submittedBy: undefined,
+      days: null,
     });
 
     const searchInput = screen.getByPlaceholderText("Search resources...");
@@ -157,6 +158,7 @@ describe("Feed Component", () => {
       q: undefined,
       tag: undefined,
       submittedBy: undefined,
+      days: null,
     });
 
     await act(async () => {
@@ -167,6 +169,7 @@ describe("Feed Component", () => {
       q: "react",
       tag: undefined,
       submittedBy: undefined,
+      days: null,
     });
   });
 

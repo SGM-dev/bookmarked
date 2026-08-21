@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Socket } from "socket.io-client";
-import { listResources } from "@/lib/api";
+import { listResources, listTrendingResources } from "@/lib/api";
 import { AuthState, Resource } from "@/lib/types";
 import { useReactionHistory } from "@/lib/useReactionHistory";
 import ResourceCard from "./ResourceCard";
@@ -31,6 +31,7 @@ export default function Feed({ auth, socket }: FeedProps) {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [mineOnly, setMineOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [days, setDays] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const { history: reactionHistory, recordReaction } = useReactionHistory(
     auth?.user.id ?? null,
@@ -52,6 +53,7 @@ export default function Feed({ auth, socket }: FeedProps) {
       q: debouncedQuery || undefined,
       tag: tagFilter || undefined,
       submittedBy: mineOnly && auth ? auth.user.id : undefined,
+      days: days,
     })
       .then(({ resources: fetched }) => {
         if (!cancelled) setResources(fetched);
@@ -67,14 +69,17 @@ export default function Feed({ auth, socket }: FeedProps) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, tagFilter, mineOnly, auth]);
+  }, [debouncedQuery, tagFilter, mineOnly, auth, days]);
 
   useEffect(() => {
     if (!socket) return;
 
     function handleCreated(resource: Resource) {
+      if (days !== null) return;
+
       const matchesMineOnlyFilter =
         !mineOnly || (auth && resource?.submittedBy?.id === auth.user.id);
+
       const matchesTagFilter =
         !tagFilter || (resource.tags && resource.tags.includes(tagFilter));
       const matchesSearchFilter = matchesResourceSearch(
@@ -99,7 +104,7 @@ export default function Feed({ auth, socket }: FeedProps) {
       socket.off("resource:created", handleCreated);
       socket.off("resource:updated", handleUpdated);
     };
-  }, [socket, auth, mineOnly, tagFilter, debouncedQuery]);
+  }, [socket, auth, mineOnly, tagFilter, debouncedQuery, days]);
 
   const tags = useMemo(() => {
     const set = new Set<string>();
@@ -132,6 +137,18 @@ export default function Feed({ auth, socket }: FeedProps) {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="search-input"
         />
+        <select
+          value={days ?? ""}
+          onChange={(e) =>
+            setDays(e.target.value === "" ? null : Number(e.target.value))
+          }
+        >
+          <option value="">All time</option>
+          <option value="1">Today</option>
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
         {auth && (
           <label className="mine-toggle">
             <input

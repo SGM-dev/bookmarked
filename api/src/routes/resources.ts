@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { prisma } from "../db";
 import { requireAuth } from "../middleware/auth";
 import { resourcesToCsv } from "../utils/csv";
+import { subDays } from "date-fns";
 import rateLimit from "express-rate-limit";
 
 const router = express.Router();
@@ -68,10 +69,10 @@ router.get("/export", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/resources?tag=<tag>&submittedBy=<userId>
+// GET /api/resources?tag=<tag>&submittedBy=<userId>&trending=<days>&q=<search>
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { tag, submittedBy, q } = req.query;
+    const { tag, submittedBy, q, days } = req.query;
 
     let matchingIds: string[] | undefined;
 
@@ -89,6 +90,12 @@ router.get("/", async (req: Request, res: Response) => {
       }
     }
 
+    const parsedDays = typeof days === "string" ? parseInt(days) : undefined;
+    const isTrending =
+      typeof parsedDays === "number" &&
+      !Number.isNaN(parsedDays) &&
+      parsedDays > 0;
+    const cutOff = subDays(new Date(), parsedDays as number);
     const resources = await prisma.resource.findMany({
       where: {
         ...(typeof tag === "string"
@@ -99,11 +106,30 @@ router.get("/", async (req: Request, res: Response) => {
           : {}),
         ...(matchingIds !== undefined ? { id: { in: matchingIds } } : {}),
       },
-      orderBy: { createdAt: "desc" },
-      include: resourceInclude,
-    });
 
-    return res.json({ resources });
+      ...(isTrending ? {} : { orderBy: { createdAt: "desc" as const } }),
+      include: {
+        submittedBy: { select: { id: true, displayName: true, email: true } },
+        reactions: isTrending
+          ? {
+            where: { createdAt: { gte: cutOff } },
+            include: {
+              user: { select: { id: true, displayName: true, email: true } },
+            },
+            orderBy: { createdAt: "asc" as const },
+          }
+          : resourceInclude.reactions,
+      },
+    });
+    const result = isTrending
+      ? resources
+        .filter((resource) => resource.reactions.length > 0)
+        .sort((a, b) => b.reactions.length - a.reactions.length)
+      : resources;
+
+    if (result.length === 0) return res.json({ resources: [] });
+
+    return res.json({ resources: result });
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch resources" });
   }
@@ -137,7 +163,6 @@ router.get("/leaderboard", async (_req: Request, res: Response) => {
 });
 
 // GET /api/resources/random
-// Registered before "/:id" so it is not matched as a resource id.
 router.get("/random", async (req: Request, res: Response) => {
   try {
     const allResource = await prisma.resource.findMany({
@@ -159,7 +184,6 @@ router.get("/random", async (req: Request, res: Response) => {
 });
 
 // GET /api/resources/tag-counts
-// Registered before "/:id" so it is not matched as a resource id.
 router.get("/tag-counts", async (_req: Request, res: Response) => {
   try {
     const tagCounts = await prisma.resource.groupBy({
